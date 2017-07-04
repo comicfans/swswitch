@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Threading;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -20,13 +21,13 @@ namespace WindowsFormsApplication
 
             listBox_result.DisplayMember = "text";
             listBox_result.ValueMember = "hwnd";
-  int id = 0;     // The id of the hotkey.
+            int id = 0;     // The id of the hotkey.
             RegisterHotKey(this.Handle, id, (int)KeyModifier.Control, Keys.D3.GetHashCode());       // Register Shift + A as global hotkey.
 
-          
+
         }
 
-        
+
 
         protected delegate bool EnumWindowsProc(HWND hWnd, IntPtr lParam);
 
@@ -46,10 +47,10 @@ namespace WindowsFormsApplication
         [DllImport("USER32.DLL")]
         static extern IntPtr GetShellWindow();
 
-      
+
 
         [DllImport("User32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd); 
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         [DllImport("Psapi.dll", EntryPoint = "GetModuleFileNameEx")]
         public static extern uint GetModuleFileNameEx(uint handle, IntPtr hModule, [Out] StringBuilder lpszFileName, uint nSize);
@@ -66,14 +67,14 @@ namespace WindowsFormsApplication
             HWND shellWindow = GetShellWindow();
             Dictionary<HWND, string[]> windows = new Dictionary<HWND, string[]>();
 
-            EnumWindows(delegate(HWND hWnd, IntPtr lParam)
+            EnumWindows(delegate (HWND hWnd, IntPtr lParam)
             {
                 if (hWnd == shellWindow) return true;
                 if (!IsWindowVisible(hWnd)) return true;
-//
-                
+                //
+
                 //exclude self
-                if(hWnd==this.Handle)return true;
+                if (hWnd == this.Handle) return true;
 
 
                 var process = GetProcessHandleFromHwnd(hWnd);
@@ -82,31 +83,35 @@ namespace WindowsFormsApplication
 
                 GetWindowThreadProcessId(hWnd, out pid);
 
+                Process p = Process.GetProcessById((int)pid);
+                var exeName = "";
 
-
-                Process p=Process.GetProcessById((int)pid);
-
-                if (p == null)
+                if (p != null)
                 {
-                    return true;
+                    try
+                    {
+                        exeName = p.MainModule.FileName;
+                    }
+                    catch (System.ComponentModel.Win32Exception ex)
+                    {
+                        //can not get exe name
+                        Console.WriteLine("{0}", ex);
+                    }
                 }
+
+                string windowText = "";
 
                 int length = GetWindowTextLength(hWnd);
-                if (length == 0) return true;
-
-                StringBuilder builder = new StringBuilder(length);
-                GetWindowText(hWnd, builder, length + 1);
-
-                var exeName = "";
-                try
+                if (length != 0)
                 {
-                    exeName = p.MainModule.FileName;
 
-                }catch(System.ComponentModel.Win32Exception ex){
-                    //can not get exe name
+                    StringBuilder builder = new StringBuilder(length);
+                    GetWindowText(hWnd, builder, length + 1);
+                    windowText = builder.ToString();
                 }
 
-                windows[hWnd] = new string[]{builder.ToString(),exeName};
+
+                windows[hWnd] = new string[]{windowText,exeName};
                 return true;
 
             }, IntPtr.Zero);
@@ -123,6 +128,82 @@ namespace WindowsFormsApplication
             refreshResult();
             
         }
+
+        const int EVERYTHING_OK = 0;
+        const int EVERYTHING_ERROR_MEMORY = 1;
+        const int EVERYTHING_ERROR_IPC = 2;
+        const int EVERYTHING_ERROR_REGISTERCLASSEX = 3;
+        const int EVERYTHING_ERROR_CREATEWINDOW = 4;
+        const int EVERYTHING_ERROR_CREATETHREAD = 5;
+        const int EVERYTHING_ERROR_INVALIDINDEX = 6;
+        const int EVERYTHING_ERROR_INVALIDCALL = 7;
+
+        [DllImport("Everything64.dll", CharSet = CharSet.Unicode)]
+        public static extern int Everything_SetSearchW(string lpSearchString);
+        [DllImport("Everything64.dll")]
+        public static extern void Everything_SetMatchPath(bool bEnable);
+        [DllImport("Everything64.dll")]
+        public static extern void Everything_SetMatchCase(bool bEnable);
+        [DllImport("Everything64.dll")]
+        public static extern void Everything_SetMatchWholeWord(bool bEnable);
+        [DllImport("Everything64.dll")]
+        public static extern void Everything_SetRegex(bool bEnable);
+        [DllImport("Everything64.dll")]
+        public static extern void Everything_SetMax(int dwMax);
+        [DllImport("Everything64.dll")]
+        public static extern void Everything_SetOffset(int dwOffset);
+
+        [DllImport("Everything64.dll")]
+        public static extern bool Everything_GetMatchPath();
+        [DllImport("Everything64.dll")]
+        public static extern bool Everything_GetMatchCase();
+        [DllImport("Everything64.dll")]
+        public static extern bool Everything_GetMatchWholeWord();
+        [DllImport("Everything64.dll")]
+        public static extern bool Everything_GetRegex();
+        [DllImport("Everything64.dll")]
+        public static extern UInt32 Everything_GetMax();
+        [DllImport("Everything64.dll")]
+        public static extern UInt32 Everything_GetOffset();
+        [DllImport("Everything64.dll")]
+        public static extern string Everything_GetSearchW();
+        [DllImport("Everything64.dll")]
+        public static extern int Everything_GetLastError();
+
+        [DllImport("Everything64.dll")]
+        public static extern bool Everything_QueryW(bool bWait);
+
+        [DllImport("Everything64.dll")]
+        public static extern void Everything_SortResultsByPath();
+
+        [DllImport("Everything64.dll")]
+        public static extern int Everything_GetNumFileResults();
+        [DllImport("Everything64.dll")]
+        public static extern int Everything_GetNumFolderResults();
+        [DllImport("Everything64.dll")]
+        public static extern int Everything_GetNumResults();
+        [DllImport("Everything64.dll")]
+        public static extern int Everything_GetTotFileResults();
+        [DllImport("Everything64.dll")]
+        public static extern int Everything_GetTotFolderResults();
+        [DllImport("Everything64.dll")]
+        public static extern int Everything_GetTotResults();
+        [DllImport("Everything64.dll")]
+        public static extern bool Everything_IsVolumeResult(int nIndex);
+        [DllImport("Everything64.dll")]
+        public static extern bool Everything_IsFolderResult(int nIndex);
+        [DllImport("Everything64.dll")]
+        public static extern bool Everything_IsFileResult(int nIndex);
+        [DllImport("Everything64.dll", CharSet = CharSet.Unicode)]
+        public static extern void Everything_GetResultFullPathNameW(int nIndex, StringBuilder lpString, int nMaxCount);
+        [DllImport("Everything64.dll")]
+        public static extern void Everything_Reset();
+
+        [DllImport("Everything64.dll", CharSet = CharSet.Unicode)]
+        public static extern IntPtr Everything_GetResultFileNameW(int nIndex);
+
+
+
 
         private void toTray()
         {
@@ -192,24 +273,23 @@ namespace WindowsFormsApplication
             public HWND hwnd { get; set; }
         }
 
-        private void refreshResult()
+        private void addWindowResult(string filterText)
         {
-            listBox_result.Items.Clear();
-
-            var filter = textBox_input.Text.ToLower();
-
+            var filter = filterText.ToLower();
             foreach (var hw in cachedResult.Keys)
             {
                 var array = cachedResult[hw];
 
-                
-                foreach(var test in array){
-                    if (test.ToLower().Contains(filter)){
-                        listBox_result.Items.Add(new ListItem {text=array[0]+ array[1],hwnd=hw });
+
+                foreach (var test in array)
+                {
+                    if (test.ToLower().Contains(filter))
+                    {
+                        listBox_result.Items.Add(new ListItem { text = array[0] + array[1], hwnd = hw });
                         break;
                     }
                 }
-                
+
             }
 
             foreach (var it in listBox_result.Items)
@@ -217,9 +297,48 @@ namespace WindowsFormsApplication
                 listBox_result.SelectedIndex = 0;
                 break;
             }
+        }
+
+        private void addFileResult(string filter)
+        {
+            Everything_SetSearchW(filter);
+
+            // use our own custom scrollbar... 			
+            // Everything_SetOffset(VerticalScrollBarPosition...);
+
+            Everything_SetMax(listBox_result.ClientRectangle.Height / listBox_result.ItemHeight);
+            // execute the query
+            Everything_QueryW(true);
+
+            // sort by path
+            // Everything_SortResultsByPath();
 
 
-            
+            StringBuilder builder = new StringBuilder(260);
+            // loop through the results, adding each result to the listbox.
+            for (int i = listBox_result.Items.Count; i < Everything_GetNumResults(); i++)
+            {
+                // add it to the list box				
+
+
+                Everything_GetResultFullPathNameW(i, builder, builder.Capacity);
+                builder.Append(Path.PathSeparator);
+                builder.Append(Marshal.PtrToStringUni(Everything_GetResultFileNameW(i)));
+                listBox_result.Items.Insert(i, builder.ToString());
+            }
+
+        }
+
+        private void refreshResult()
+        {
+            listBox_result.Items.Clear();
+
+            var filter = textBox_input.Text;
+
+            addWindowResult(filter);
+
+            addFileResult(filter);
+
         }
 
         private void restoreFromTray()
@@ -355,10 +474,21 @@ static extern bool GetWindowRect(IntPtr hwnd, out RECT lpRect);
     const UInt32 SW_SHOWMINNOACTIVE =  7;
     const UInt32 SW_SHOWNA =       8;
     const UInt32 SW_RESTORE =      9;
-        
+
+        private void popMenu() {
+IntPtr DesktopFolder;
+            
+SHGetDesktopFolder(ref DesktopFolder);
+        }
         private void listBox_result_SelectedIndexChanged(object sender, EventArgs e)
         {
             var item = listBox_result.SelectedItem as ListItem;
+
+            if (item is null) {
+                //not window item
+                this.Text = "file:"+listBox_result.SelectedItem.ToString();
+                return;
+            }
 
             RECT rect;
 
@@ -371,7 +501,8 @@ static extern bool GetWindowRect(IntPtr hwnd, out RECT lpRect);
             }
             
             ForceWindowToForeground(item.hwnd,this.Handle);
-            
+
+            this.Text = "win:" + item.text;
             
            
             //SetWindowPos(item.hwnd, this.Handle, rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top, 0);
